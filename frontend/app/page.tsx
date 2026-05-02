@@ -15,7 +15,7 @@ export default function HomePage() {
 
         <div className="mt-10 flex items-center justify-center gap-4">
           <Link
-            href="/login"
+            href="/dashboard"
             className="rounded-md bg-brand-600 px-5 py-2.5 text-white hover:bg-brand-700 transition"
           >
             Get started

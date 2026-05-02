@@ -39,6 +39,7 @@ yarn-error.log*
 Thumbs.db
 
 # Project-specific
+PROJECT_PROGRESS.md
 backend/storage/
 backend/uploads/
 chroma_data/

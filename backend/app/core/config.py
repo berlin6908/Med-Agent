@@ -41,9 +41,10 @@ class Settings(BaseSettings):
 
     GOOGLE_API_KEY: str = ""
     LLM_MODEL: str = "gemini-2.5-flash"
-    EMBEDDING_MODEL: str = "text-embedding-004"
+    EMBEDDING_MODEL: str = "gemini-embedding-001"
     EMBEDDING_DIMENSIONS: int = 768
 
+    RERANKER_ENABLED: bool = True
     RERANKER_MODEL: str = "BAAI/bge-reranker-v2-m3"
     RERANKER_TOP_K: int = 5
 

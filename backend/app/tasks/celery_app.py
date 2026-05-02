@@ -6,7 +6,7 @@ celery_app = Celery(
     "drugagent",
     broker=settings.CELERY_BROKER_URL,
     backend=settings.CELERY_RESULT_BACKEND,
-    include=[],
+    include=["app.tasks.document_tasks"],
 )
 
 celery_app.conf.update(

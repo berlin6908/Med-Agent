@@ -116,6 +116,12 @@ export default function LoginPage() {
                 >
                   Sign out
                 </button>
+                <Link
+                  href="/dashboard"
+                  className="block w-full rounded-md bg-brand-600 px-4 py-2.5 text-center font-semibold text-white hover:bg-brand-700"
+                >
+                  Open workspace
+                </Link>
               </div>
             ) : (
               <>
