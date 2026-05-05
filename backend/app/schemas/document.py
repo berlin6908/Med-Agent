@@ -9,6 +9,8 @@ class DocumentRead(BaseModel):
     content_type: str
     file_size: int
     processing_status: str
+    processing_stage: str
+    processing_progress: int
     extracted_text: str | None
     error_message: str | None
     created_at: datetime
@@ -23,6 +25,9 @@ class DocumentListItem(BaseModel):
     content_type: str
     file_size: int
     processing_status: str
+    processing_stage: str
+    processing_progress: int
+    error_message: str | None
     created_at: datetime
 
     model_config = {"from_attributes": True}

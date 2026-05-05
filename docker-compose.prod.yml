@@ -1,42 +1,33 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: drugagent-postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-      interval: 5s
+      interval: 10s
       timeout: 5s
       retries: 5
 
   redis:
     image: redis:7-alpine
-    container_name: drugagent-redis
     restart: unless-stopped
-    ports:
-      - "6379:6379"
     volumes:
       - redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
+      interval: 10s
       timeout: 5s
       retries: 5
 
   chroma:
     image: chromadb/chroma:latest
-    container_name: drugagent-chroma
     restart: unless-stopped
-    ports:
-      - "8001:8000"
     volumes:
       - chroma_data:/data
     environment:
@@ -47,18 +38,15 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-      args:
-        INSTALL_DEV: "true"
-    container_name: drugagent-backend
     restart: unless-stopped
     env_file: .env
     environment:
+      APP_ENV: production
       CHROMA_HOST: chroma
       CHROMA_PORT: 8000
     ports:
       - "8000:8000"
     volumes:
-      - ./backend:/app
       - backend_storage:/app/storage
     depends_on:
       postgres:
@@ -67,22 +55,24 @@ services:
         condition: service_healthy
       chroma:
         condition: service_started
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
 
   celery_worker:
     build:
       context: ./backend
       dockerfile: Dockerfile
-      args:
-        INSTALL_DEV: "true"
-    container_name: drugagent-celery
     restart: unless-stopped
     env_file: .env
     environment:
+      APP_ENV: production
       CHROMA_HOST: chroma
       CHROMA_PORT: 8000
     volumes:
-      - ./backend:/app
       - backend_storage:/app/storage
     depends_on:
       redis:
@@ -94,20 +84,20 @@ services:
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile
-    container_name: drugagent-frontend
+      dockerfile: Dockerfile.prod
     restart: unless-stopped
-    ports:
-      - "3000:3000"
     environment:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-      - /app/.next
+    ports:
+      - "3000:3000"
     depends_on:
-      - backend
-    command: npm run dev
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
 volumes:
   postgres_data:

@@ -28,6 +28,18 @@ class Document(Base):
         default="uploaded",
         server_default="uploaded",
     )
+    processing_stage: Mapped[str] = mapped_column(
+        String(100),
+        nullable=False,
+        default="Waiting",
+        server_default="Waiting",
+    )
+    processing_progress: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+        server_default="0",
+    )
     extracted_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(

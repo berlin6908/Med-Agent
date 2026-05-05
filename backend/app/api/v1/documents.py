@@ -30,6 +30,8 @@ def upload_document(
         file_size=file_size,
         storage_path=storage_path,
         processing_status="queued",
+        processing_stage="Queued for processing",
+        processing_progress=5,
     )
     db.add(document)
     db.commit()
@@ -121,6 +123,8 @@ def retry_document_processing(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
 
     document.processing_status = "queued"
+    document.processing_stage = "Queued for reprocessing"
+    document.processing_progress = 5
     document.error_message = None
     db.commit()
     db.refresh(document)

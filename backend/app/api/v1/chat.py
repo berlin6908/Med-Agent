@@ -1,4 +1,5 @@
 import json
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
@@ -10,6 +11,7 @@ from app.models import User
 from app.schemas.chat import ChatRequest, ChatResponse, ChatSessionDetail, ChatSessionRead
 from app.services.chat import (
     answer_question,
+    delete_session,
     get_session_detail,
     list_sessions,
     prepare_chat_answer,
@@ -18,6 +20,7 @@ from app.services.chat import (
 )
 
 router = APIRouter(prefix="/chat", tags=["chat"])
+logger = logging.getLogger(__name__)
 
 
 @router.post("", response_model=ChatResponse)
@@ -67,6 +70,14 @@ def chat_stream(
                 )
                 + "\n"
             )
+        except Exception:
+            logger.exception("chat_stream_failed user_id=%s", user_id)
+            yield json.dumps(
+                {
+                    "type": "error",
+                    "message": "Chat streaming failed. Please try again.",
+                }
+            ) + "\n"
         finally:
             db.close()
 
@@ -99,3 +110,14 @@ def session_detail(
     if session is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chat session not found")
     return session
+
+
+@router.delete("/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_chat_session(
+    session_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> None:
+    deleted = delete_session(db, current_user.id, session_id)
+    if not deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chat session not found")

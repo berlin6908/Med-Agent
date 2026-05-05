@@ -1,11 +1,10 @@
 from datetime import UTC, datetime
 
-from sqlalchemy import desc, select
+from sqlalchemy import delete, desc, select
 from sqlalchemy.orm import Session
 
+from app.agent.leaflet_agent import get_leaflet_agent
 from app.models import ChatMessage, ChatSession
-from app.services.llm import generate_grounded_answer, stream_grounded_answer
-from app.services.retrieval import build_retrieval_response
 
 
 def _make_title(message: str) -> str:
@@ -35,25 +34,16 @@ def answer_question(
     session_id: str | None = None,
 ) -> dict:
     session = get_or_create_session(db, user_id, message, session_id)
-    retrieval = build_retrieval_response(user_id, message, top_k)
-    citations = [item["citation"] for item in retrieval["results"]]
-
-    if retrieval["context"]:
-        answer = generate_grounded_answer(message, retrieval["context"])
-    else:
-        answer = (
-            "I could not find relevant information in your uploaded documents. "
-            "Please consult a qualified clinician or pharmacist for medical guidance."
-        )
+    agent_result = get_leaflet_agent().answer(user_id, message, top_k)
 
     db.add(ChatMessage(session_id=session.id, role="user", content=message))
     db.add(
         ChatMessage(
             session_id=session.id,
             role="assistant",
-            content=answer,
-            context=retrieval["context"],
-            citations=citations,
+            content=agent_result.answer,
+            context=agent_result.context,
+            citations=agent_result.citations,
         )
     )
     session.updated_at = datetime.now(UTC)
@@ -61,9 +51,9 @@ def answer_question(
 
     return {
         "session_id": session.id,
-        "answer": answer,
-        "citations": citations,
-        "context": retrieval["context"],
+        "answer": agent_result.answer,
+        "citations": agent_result.citations,
+        "context": agent_result.context,
     }
 
 
@@ -97,20 +87,12 @@ def prepare_chat_answer(
     session_id: str | None = None,
 ) -> tuple[ChatSession, dict, list[dict]]:
     session = get_or_create_session(db, user_id, message, session_id)
-    retrieval = build_retrieval_response(user_id, message, top_k)
-    citations = [item["citation"] for item in retrieval["results"]]
-    return session, retrieval, citations
+    agent_result = get_leaflet_agent().retrieve(user_id, message, top_k)
+    return session, agent_result.retrieval, agent_result.citations
 
 
 def stream_answer_chunks(message: str, context: str):
-    if not context:
-        yield (
-            "I could not find relevant information in your uploaded documents. "
-            "Please consult a qualified clinician or pharmacist for medical guidance."
-        )
-        return
-
-    yield from stream_grounded_answer(message, context)
+    yield from get_leaflet_agent().stream_answer(message, context)
 
 
 def list_sessions(db: Session, user_id: str) -> list[ChatSession]:
@@ -154,3 +136,16 @@ def get_session_detail(db: Session, user_id: str, session_id: str) -> dict | Non
             for message in messages
         ],
     }
+
+
+def delete_session(db: Session, user_id: str, session_id: str) -> bool:
+    session = db.scalar(
+        select(ChatSession).where(ChatSession.id == session_id, ChatSession.user_id == user_id)
+    )
+    if session is None:
+        return False
+
+    db.execute(delete(ChatMessage).where(ChatMessage.session_id == session.id))
+    db.delete(session)
+    db.commit()
+    return True
